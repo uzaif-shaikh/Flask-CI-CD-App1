@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>To-Do · CI/CD Demo</title>
+  <style>
+    :root { --bg:#0f172a; --card:#1e293b; --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--text);
+           display:flex; justify-content:center; padding:24px 16px; }
+    main { width:100%; max-width:480px; }
+    h1 { font-size:1.4rem; margin:0 0 4px; }
+    p.sub { color:var(--muted); margin:0 0 20px; font-size:.9rem; }
+    form { display:flex; gap:8px; margin-bottom:16px; }
+    input { flex:1; padding:10px 12px; border-radius:8px; border:1px solid #334155;
+            background:var(--card); color:var(--text); font-size:1rem; }
+    button { padding:10px 14px; border:0; border-radius:8px; background:var(--accent);
+             color:#0f172a; font-weight:600; cursor:pointer; }
+    ul { list-style:none; padding:0; margin:0; }
+    li { display:flex; align-items:center; gap:10px; background:var(--card);
+         padding:10px 12px; border-radius:8px; margin-bottom:8px; }
+    li span { flex:1; cursor:pointer; }
+    li.done span { text-decoration:line-through; color:var(--muted); }
+    li button { background:transparent; color:var(--muted); padding:4px 8px; }
+    footer { margin-top:24px; color:var(--muted); font-size:.8rem; text-align:center; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>To-Do List</h1>
+  <p class="sub">Flask app deployed with Jenkins + Docker</p>
+
+  <form id="add-form">
+    <input id="title" placeholder="Add a task…" autocomplete="off" required>
+    <button type="submit">Add</button>
+  </form>
+
+  <ul id="list">
+    {% for t in todos %}
+    <li class="{{ 'done' if t.done else '' }}" data-id="{{ t.id }}">
+      <span>{{ t.title }}</span><button class="del">✕</button>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <footer>Build pipeline: GitHub → Jenkins → Docker → AWS EC2</footer>
+</main>
+
+<script>
+  const list = document.getElementById('list');
+
+  function render(todos) {
+    list.innerHTML = '';
+    todos.forEach(t => {
+      const li = document.createElement('li');
+      li.dataset.id = t.id;
+      if (t.done) li.className = 'done';
+      const span = document.createElement('span');
+      span.textContent = t.title;
+      const del = document.createElement('button');
+      del.className = 'del';
+      del.textContent = '✕';
+      li.append(span, del);
+      list.append(li);
+    });
+  }
+
+  async function refresh() {
+    const res = await fetch('/api/todos');
+    render(await res.json());
+  }
+
+  document.getElementById('add-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const input = document.getElementById('title');
+    await fetch('/api/todos', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({title: input.value})
+    });
+    input.value = '';
+    refresh();
+  });
+
+  list.addEventListener('click', async e => {
+    const li = e.target.closest('li');
+    if (!li) return;
+    const id = li.dataset.id;
+    if (e.target.classList.contains('del')) {
+      await fetch('/api/todos/' + id, {method: 'DELETE'});
+    } else {
+      await fetch('/api/todos/' + id + '/toggle', {method: 'POST'});
+    }
+    refresh();
+  });
+</script>
+</body>
+</html>
